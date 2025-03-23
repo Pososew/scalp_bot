@@ -9,7 +9,7 @@ def calculate_bollinger_bands(df, period=20):
     return bb.bollinger_hband(), bb.bollinger_lband()
 
 def calculate_macd(df):
-    macd = ta.momentum.MACD(df['close'])
+    macd = ta.trend.MACD(df['close'])
     return macd.macd(), macd.macd_signal()
 
 def calculate_support_resistance(df):

@@ -7,6 +7,7 @@ def main_menu():
          InlineKeyboardButton("📜 История", callback_data='history')],
         [InlineKeyboardButton("➕ Добавить позицию", callback_data='add_position'),
          InlineKeyboardButton("➖ Удалить позицию", callback_data='delete_position')],
-        [InlineKeyboardButton("⚙️ Установить баланс", callback_data='set_balance')]
+        [InlineKeyboardButton("⚙️ Установить баланс", callback_data='set_balance')],
+        [InlineKeyboardButton("📌 Сигналы", callback_data='signals')]  # ← новая кнопка
     ]
     return InlineKeyboardMarkup(keyboard)
