@@ -1,0 +1,7 @@
+ccxt
+python-telegram-bot
+python-dotenv
+pandas
+ta
+SQLAlchemy
+numpy
