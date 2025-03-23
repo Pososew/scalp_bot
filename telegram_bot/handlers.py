@@ -90,7 +90,8 @@ def setup_handlers(app):
             SET_BALANCE: [MessageHandler(filters.TEXT & allowed_filter, set_balance)],
             DELETE_POSITION: [MessageHandler(filters.TEXT & allowed_filter, delete_position)]
         },
-        fallbacks=[]
+        fallbacks=[],
+        per_message=True 
     )
 
     app.add_handler(CommandHandler("start", start, allowed_filter))
