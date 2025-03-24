@@ -9,16 +9,19 @@ class Position(Base):
     __tablename__ = 'positions'
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer)  # 👈 Добавляем это!
     symbol = Column(String)
     entry_price = Column(Float)
     amount = Column(Float)
     take_profit = Column(Float)
     stop_loss = Column(Float)
+    direction = Column(String) 
 
 class Account(Base):
     __tablename__ = 'account'
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, unique=True)
     balance = Column(Float)
 
 class Trade(Base):
