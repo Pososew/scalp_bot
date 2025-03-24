@@ -8,6 +8,7 @@ from config.config import PROFIT_TARGET, STOP_LOSS
 from core.signals import check_signals_for_all_symbols
 from telegram import Bot
 from config.config import ALLOWED_USERS, TELEGRAM_BOT_TOKEN
+from core.database import Trade
 
 allowed_filter = filters.User(ALLOWED_USERS)
 
@@ -33,12 +34,14 @@ async def button_handler(update, context):
             await query.edit_message_text("У тебя нет открытых позиций.", reply_markup=main_menu())
             return ConversationHandler.END
         else:
-            msg = "📌 Выбери ID позиции, чтобы удалить:\n\n"
+            msg = "📌 Выбери ID позиции, чтобы удалить:"
+
             for p in positions:
-                msg += (f"ID: {p.id} | {p.symbol} по {p.entry_price}\n")
+                msg += (f"ID: {p.id} | {p.symbol} по {p.entry_price}")
 
             await query.edit_message_text(msg)
             await query.message.reply_text("Отправь ID позиции для удаления:")
+            context.user_data['awaiting_delete'] = True
             return DELETE_POSITION
 
     
@@ -69,21 +72,16 @@ async def button_handler(update, context):
                         f"Прибыль: {pnl_percent:.2f}%\n")
             await query.edit_message_text(msg, reply_markup=main_menu())
 
-    elif query.data == 'signals':
-        signals = check_signals_for_all_symbols()
-        msg = "📌 Текущие сигналы:\n\n"
-        for signal in signals:
-            msg += (
-                f"{'📗' if signal['signal']=='LONG' else '📕' if signal['signal']=='SHORT' else '📍'} "
-                f"{signal['symbol']}: {signal['signal']}\n"
-                f"Цена: {signal['close']}\n"
-                f"RSI: {signal['rsi']:.2f}, MACD: {signal['macd']:.4f}\n"
-                f"TP: {signal['bb_upper']:.2f}, SL: {signal['bb_lower']:.2f}\n\n"
-            )
-        await query.message.reply_text(msg, reply_markup=main_menu())
-
     elif query.data == 'history':
-        await query.edit_message_text("Функция истории ещё не реализована.", reply_markup=main_menu())
+        session = Session()
+        trades = session.query(Trade).filter(Trade.user_id == query.from_user.id).order_by(Trade.id.desc()).limit(10).all()
+        if not trades:
+            await query.edit_message_text("История пуста.", reply_markup=main_menu())
+        else:
+            msg = "📜 История сделок:\n"
+            for trade in trades:
+                msg += f"{trade.symbol}: {'🟢' if trade.pnl >= 0 else '🔴'} {trade.pnl:.2f}$\n"
+            await query.edit_message_text(msg, reply_markup=main_menu())
 
 async def add_symbol(update, context):
     context.user_data['symbol'] = update.message.text.upper()
@@ -162,25 +160,33 @@ async def set_balance(update, context):
     await update.message.reply_text(f"Баланс установлен: {balance:.2f}$", reply_markup=main_menu())
     return ConversationHandler.END
 
-async def delete_position(update, context):
+async def handle_delete_position(update, context):
     session = Session()
-    position_id = int(update.message.text)
-    position = session.query(Position).filter(Position.id == position_id).first()
+    try:
+        position_id = int(update.message.text)
+        position = session.query(Position).filter(Position.id == position_id).first()
+        if not position:
+            await update.message.reply_text("Позиция не найдена.", reply_markup=main_menu())
+            return ConversationHandler.END
 
-    if position:
         current_price = get_current_price(position.symbol)
         pnl = (current_price - position.entry_price) * position.amount
 
+        # Обновляем баланс
         account = session.query(Account).first()
         account.balance += pnl
+
+        # Добавляем в историю сделку
+        trade = Trade(user_id=update.effective_user.id, symbol=position.symbol, pnl=pnl)
+        session.add(trade)
 
         session.delete(position)
         session.commit()
 
-        await update.message.reply_text(f"Позиция удалена. PnL: {pnl:.2f}$. Баланс обновлен: {account.balance:.2f}$", reply_markup=main_menu())
-    else:
-        await update.message.reply_text("Позиция не найдена.", reply_markup=main_menu())
-
+        await update.message.reply_text(
+            f"Позиция закрыта. PnL: {'🟢' if pnl >= 0 else '🔴'} {pnl:.2f}$Баланс обновлён: {account.balance:.2f}$",reply_markup=main_menu())
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка удаления позиции: {e}", reply_markup=main_menu())
     return ConversationHandler.END
 
 async def auto_signals_check(application):
@@ -219,7 +225,7 @@ def setup_handlers(app):
         ],
         states={
         SET_BALANCE: [MessageHandler(filters.TEXT & allowed_filter, set_balance)],
-        DELETE_POSITION: [MessageHandler(filters.TEXT & allowed_filter, delete_position)],
+        DELETE_POSITION: [MessageHandler(filters.TEXT & allowed_filter, handle_delete_position)],
         ADD_SYMBOL: [MessageHandler(filters.TEXT & allowed_filter, add_symbol)],
         ADD_PRICE: [MessageHandler(filters.TEXT & allowed_filter, add_price)],
         ADD_AMOUNT: [MessageHandler(filters.TEXT & allowed_filter, add_amount)],

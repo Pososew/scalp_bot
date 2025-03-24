@@ -21,4 +21,12 @@ class Account(Base):
     id = Column(Integer, primary_key=True)
     balance = Column(Float)
 
+class Trade(Base):
+    __tablename__ = 'trades'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer)
+    symbol = Column(String)
+    pnl = Column(Float)
+
 Base.metadata.create_all(engine)
