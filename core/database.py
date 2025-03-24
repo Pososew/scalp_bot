@@ -8,7 +8,7 @@ Base = declarative_base()
 class Position(Base):
     __tablename__ = 'positions'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer)  # 👈 Добавляем это!
     symbol = Column(String)
     entry_price = Column(Float)
